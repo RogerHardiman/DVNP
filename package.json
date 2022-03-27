@@ -1,0 +1,34 @@
+{
+  "name": "dvnp_broadcaster",
+  "version": "1.0.0",
+  "description": "DVNP Broadcaster",
+  "main": "dist/dvnp_broadcaster.js",
+  "scripts": {
+    "start": "tsc && node dist/dvnp_broadcaster.js",
+    "lint": "eslint . --ext .ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "DVNP",
+    "CCTV",
+    "TVNP"
+  ],
+  "author": "Roger Hardiman",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "@types/cookie-parser": "^1.4.2",
+    "await-spawn": "^4.0.2",
+    "cookie-parser": "^1.4.6",
+    "express": "^4.17.3",
+    "https": "^1.0.0",
+    "pem": "^1.14.6"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.13",
+    "@types/pem": "^1.9.6",
+    "@typescript-eslint/eslint-plugin": "^5.16.0",
+    "@typescript-eslint/parser": "^5.16.0",
+    "eslint": "^8.12.0",
+    "typescript": "^4.6.3"
+  }
+}
