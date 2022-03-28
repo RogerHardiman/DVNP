@@ -1,4 +1,4 @@
-# DVNP Broadcast Server
+# DVNP Broadcast Server with sample code to a real CCTV system
 ## What is DVNP
 The Digital Video Network Protocol (DVNP) allows one Video Management System (VMS or PSIM) to request live video from another make of Video Management System (VMS or PSIM) without need for proprietary SDKs or propriatary APIs. The protocol is available from Transport for London and is standardised in Document TEC4502/E/30.03.2020 Digital Video Network Protocol Issue 1.2
 
@@ -26,3 +26,20 @@ The DVNP Broadcast Server is written in Typescript and compiles into Javascript.
 ## DVNP Consumer / Viewer
 The DVNP Consumer connects to the DVNP Broadcaster (server), authenticates, asks for a list of cameras and requests a StreamURI for each camera it wants to view. These are all implemented with HTTP GET commands with JSON replies.
 
+## DVNP Implementation
+Currently this software implements
+* Authentication (Login and Logout and Session Cookies)
+* GetNodes (list of cameras)
+* GetStreamURI (for live streams)
+* GetRecordings (for replay of cameras)
+
+PTZ and Preset control is planned.
+
+## Real CCTV Integration
+I wanted to test DVNP with real video streams.
+I have a HikVisiosn 7716 NVR Video Recorder in the office which can
+* deliver '''live''' streams of cameras via RTSP.
+* deliver '''recordings''' via RTSP when the RTSP URL includes a start time and an end time
+This made it really simple to convert this DVNP Broadcaster to issue valid Live RTSP URLs and valid Replay RTSP URLs and get real results.
+
+DVNP can be ported to other VMS systems, but with this particular HikVision recorder it was simple.
