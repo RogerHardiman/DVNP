@@ -54,7 +54,7 @@ const dvnp_broadcaster = () => __awaiter(void 0, void 0, void 0, function* () {
             "fixed": true,
             "height": 2.3,
             "bearing": 90.0,
-            "owner": "Cheltenham"
+            "owner": "RJH"
         },
         {
             "cameraid": "00026.00002",
@@ -64,7 +64,7 @@ const dvnp_broadcaster = () => __awaiter(void 0, void 0, void 0, function* () {
             "longitude": -2.10009,
             "fixed": false,
             "height": 2,
-            "owner": "Cheltenham"
+            "owner": "RJH"
         },
         {
             "cameraid": "00026.00003",
@@ -74,7 +74,7 @@ const dvnp_broadcaster = () => __awaiter(void 0, void 0, void 0, function* () {
             "longitude": -2.09976,
             "fixed": false,
             "height": 2,
-            "owner": "Cheltenham"
+            "owner": "RJH"
         }
     ];
     // Use OpenSSL to create a self signed certificate
@@ -398,9 +398,24 @@ const dvnp_broadcaster = () => __awaiter(void 0, void 0, void 0, function* () {
             // TODO - We can check the Profile passed in the URL to decide which StreamURI to use
             // TODO - The parameter is optional. In this demo we will ignore the Profile
             // In this example we hard code the RTSP URL and have no expiry date
-            const streamURL = "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4";
+            //    EG const streamURL = "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4";
+            //    EG const expires = "2099-12-31T23:59";
+            // In this example we will use the RTSL URLs from  HikVision 7716 NVR
+            // cameraid is already validated to match a real Camera ID so will be 5 digita DOT 5 digits
+            const split = req.query.cameraid.toString().split(".");
+            //const siteIdString = split[0];
+            const siteCameraId = Number(split[1]); // convert to Int
+            // Hik Live URLs are
+            //    rtsp://ip:port/Streaming/channels/101   - Camera 1, Stream 1
+            //    rtsp://ip:port/Streaming/channels/102   - Camera 1, Stream 2 (usually lower resolution)
+            //    rtsp://ip:port/Streaming/channels/201   - Camera 1, Stream 1
+            //    rtsp://ip:port/Streaming/channels/201   - Camera 2, Stream 2
+            const streamURL = `rtsp://192.168.1.10/Streaming/channels/${siteCameraId}01`;
             const expires = "2099-12-31T23:59";
-            // In a real system we would now communicate with a RTSP Proxy or an RTSP Server to allow video to stream to the viewer/Consumer.
+            // Note - DVNP Consumer will probably try and authenticate with the RTSP Server.
+            // Either the RTSP server needs to know the DVNP usernane/password
+            // or the DVNP Consumner would have config options for the RTSP username/password
+            // With other VMS systems we may need to communicate with a RTSP Proxy or an RTSP Server to produce a live video stream for the DVNP Consumer
             // <ADD RTSP SERVER CODE>
             // Add an entry to our RequestedStreams database. This is also used in StopVideo.action
             // Get the username from the Session
@@ -507,6 +522,120 @@ const dvnp_broadcaster = () => __awaiter(void 0, void 0, void 0, function* () {
             const reply = {
                 "action": "StopVideo",
                 "data": null,
+                "success": true
+            };
+            res.json(reply);
+            return;
+        });
+        ///////////////////////////////////////////////////////////////////////
+        // DVNP GetRecordings.action
+        // Example HTTP GET requests: https://xxx.xxx.xx.xxx/GetRecordings.action?recordingid=asd1231                          <- TODO - Search bookmarks on the recorder
+        // Example HTTP GET requests: https://xxx.xxx.xx.xxx/GetRecordings.action?startpoint=1541403241&endpoint=1541603241    <- Sould return ALL recordings (for all camerasid) in this time period in an array
+        //                                                                                                                     <- AND these are times in seconds. The Spec says it is to be Milliseconds!
+        ///////////////////////////////////////////////////////////////////////
+        app.get('/GetRecordings.action', function (req, res) {
+            let sessionIdNotRecognised = false;
+            let session = null;
+            // Validate JSessionID
+            if (req.cookies[JSessionIDCookieName] == undefined) {
+                // Error - no JSessionID cookie provided (perhaps it had expired at the client end)
+                sessionIdNotRecognised = true;
+            }
+            else {
+                session = validSessions.find(item => item.sessionId == req.cookies[JSessionIDCookieName]);
+                if (session == undefined) {
+                    // Error - Session was not found
+                    sessionIdNotRecognised = true;
+                }
+            }
+            if (sessionIdNotRecognised) {
+                const reply = {
+                    "action": "GetRecordings",
+                    "errorCode": 2,
+                    "message": "Session ID Not Recognised",
+                    "success": false
+                };
+                res.json(reply);
+                return;
+            }
+            // Extra.. Update the heartbeat for any DVNP command, not just Heartbeat commands
+            const now = new Date();
+            session.lastHeartbeat = now;
+            // The HTTP Get can include a recordingid OR a cameraid OR Metadata (but metadata comes in a POST message)
+            // This spec indicates that if there is no camerasid, we would return an array of URLs, one for each recording we have (ie one for each camera)
+            // TODO - Currently this code REQUIRES the cameraid to be present
+            // TODO - We do not support the recordingid (from the StartRecording.action) [but that would be a NVR bookmark or recording session's database]
+            // TODO - We do not support Metadata (that comes in a POST message)
+            // Parse the cameraid. Check the cameraid is in the cameraList
+            let cameraIdNotRecognised = false;
+            let camera = null;
+            if (req.query.cameraid == undefined) {
+                // Error - no cameraid parameter
+                cameraIdNotRecognised = true;
+            }
+            else {
+                camera = cameraList.find(item => item.cameraid == req.query.cameraid);
+                if (camera == undefined) {
+                    // Error - cameraid not in the camera list
+                    cameraIdNotRecognised = true;
+                }
+            }
+            if (cameraIdNotRecognised) {
+                const reply = {
+                    "action": "GetRecordings",
+                    "errorCode": 3,
+                    "message": "Camera ID Not Recognised",
+                    "success": false
+                };
+                res.json(reply);
+                return;
+            }
+            // This demo supports the HikVision 7716 NVR beause I have one in the office and because it supports playback via a RTSP URL which makes it simple to use
+            // Other VMS systems may a RTSP Server or RTSP Proxy (or RTMP Server) to me initialised to deliver video
+            const split = req.query.cameraid.toString().split(".");
+            12345.67890; // site id DOT camera number
+            //const siteIdString = split[0];
+            const cameraNumber = Number(split[1]); // convert to Int
+            // eg 20170313T230652Z
+            // Hik Replay URL example (from ISAPI manual)
+            // rtsp://10.17.133.46:554/ISAPI/streaming/tracks/101?starttime=20170313T230652Z&endtime=20170314T025706Z
+            // Check starttime parameter
+            let startTimeUTC8601 = null;
+            let endTimeUTC8601 = null;
+            // Starttime
+            if (req.query.startpoint == undefined) {
+                // Error. No start time
+                const reply = {
+                    "action": "GetRecordings",
+                    "errorCode": 26,
+                    "message": "No Associated Recording Found",
+                    "success": false
+                };
+                res.json(reply);
+                return;
+            }
+            else {
+                startTimeUTC8601 = new Date(Number(req.query.startpoint)).toISOString().replace(/[-:]/g, '').split('.')[0] + "Z"; // remove - and : then find the milliseconds and chop them off, then re-add "Z"
+            }
+            // Endtime
+            if (req.query.endpoint == undefined) {
+                // End time is optional
+                endTimeUTC8601 = null;
+            }
+            else {
+                endTimeUTC8601 = new Date(Number(req.query.endpoint)).toISOString().replace(/[-:]/g, '').split('.')[0] + "Z"; // remove - and : then find the milliseconds and chop them off, then re-add "Z"
+            }
+            const streamURL = (endTimeUTC8601 == null ? `rtsp://192.168.1.10/ISAPI/streaming/tracks/${cameraNumber}01?starttime=${startTimeUTC8601}`
+                : `rtsp://192.168.1.10/ISAPI/streaming/tracks/${cameraNumber}01?starttime=${startTimeUTC8601}&endtime=${endTimeUTC8601}`);
+            const expires = "2099-12-31T23:59";
+            // Send the reply
+            const reply = {
+                "action": "GetStreamURI",
+                "data": // The official spec has a square bracket here. Is 'data' supposed to be a single item or an Array of URL/Expiry objects
+                {
+                    "streamURL": streamURL,
+                    "expires": expires
+                },
                 "success": true
             };
             res.json(reply);
